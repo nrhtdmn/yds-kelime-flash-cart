@@ -18,6 +18,15 @@
         "documentation": {}
     },
     {
+        "label": "random",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "random",
+        "description": "random",
+        "detail": "random",
+        "documentation": {}
+    },
+    {
         "label": "QApplication",
         "importPath": "PyQt5.QtWidgets",
         "description": "PyQt5.QtWidgets",
@@ -138,22 +147,6 @@
         "documentation": {}
     },
     {
-        "label": "QFormLayout",
-        "importPath": "PyQt5.QtWidgets",
-        "description": "PyQt5.QtWidgets",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtWidgets",
-        "documentation": {}
-    },
-    {
-        "label": "QLineEdit",
-        "importPath": "PyQt5.QtWidgets",
-        "description": "PyQt5.QtWidgets",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtWidgets",
-        "documentation": {}
-    },
-    {
         "label": "Qt",
         "importPath": "PyQt5.QtCore",
         "description": "PyQt5.QtCore",
@@ -166,16 +159,16 @@
         "kind": 6,
         "importPath": "flash_cart",
         "description": "flash_cart",
-        "peekOfCode": "class FlashKartSekmesi(QWidget):\n    def __init__(self, db_conn, topic_id, parent=None):\n        super(FlashKartSekmesi, self).__init__(parent)\n        self.db_conn = db_conn\n        self.topic_id = topic_id\n        self.initUI()\n        self.load_cards()\n    def initUI(self):\n        layout = QVBoxLayout()\n        self.card_list = QListWidget(self)",
+        "peekOfCode": "class FlashKartSekmesi(QWidget):\n    def __init__(self, db_conn, konu_id, parent=None):\n        super(FlashKartSekmesi, self).__init__(parent)\n        self.db_conn = db_conn\n        self.konu_id = konu_id\n        self.arayuzuOlustur()\n        self.kartlariYukle()\n    def arayuzuOlustur(self):\n        layout = QVBoxLayout()\n        self.kart_listesi = QListWidget(self)",
         "detail": "flash_cart",
         "documentation": {}
     },
     {
-        "label": "StudyWindow",
+        "label": "CalismaPenceresi",
         "kind": 6,
         "importPath": "flash_cart",
         "description": "flash_cart",
-        "peekOfCode": "class StudyWindow(QWidget):\n    def __init__(self, db_conn, topic_id, parent=None):\n        super(StudyWindow, self).__init__(parent)\n        self.db_conn = db_conn\n        self.topic_id = topic_id\n        self.initUI()\n        self.load_cards()\n    def initUI(self):\n        self.setWindowTitle('Flash Kart Çalışma')\n        self.setGeometry(150, 150, 400, 300)",
+        "peekOfCode": "class CalismaPenceresi(QWidget):\n    def __init__(self, db_conn, konu_id, parent=None):\n        super(CalismaPenceresi, self).__init__(parent)\n        self.db_conn = db_conn\n        self.konu_id = konu_id\n        self.arayuzuOlustur()\n        self.kartlariYukle()\n    def arayuzuOlustur(self):\n        self.setWindowTitle('Flash Kart Çalışma')\n        self.setGeometry(150, 150, 400, 300)",
         "detail": "flash_cart",
         "documentation": {}
     },
@@ -184,7 +177,7 @@
         "kind": 6,
         "importPath": "flash_cart",
         "description": "flash_cart",
-        "peekOfCode": "class KonuSecmeDialog(QDialog):\n    def __init__(self, topics, parent=None):\n        super(KonuSecmeDialog, self).__init__(parent)\n        self.setWindowTitle(\"Konuyu Seç\")\n        self.setGeometry(200, 200, 300, 200)\n        layout = QVBoxLayout()\n        self.topic_list = QListWidget(self)\n        for topic in topics:\n            self.topic_list.addItem(topic)\n        layout.addWidget(self.topic_list)",
+        "peekOfCode": "class KonuSecmeDialog(QDialog):\n    def __init__(self, db_conn, parent=None):\n        super(KonuSecmeDialog, self).__init__(parent)\n        self.setWindowTitle(\"Konuyu Seç\")\n        self.setGeometry(200, 200, 300, 300)\n        self.db_conn = db_conn\n        layout = QVBoxLayout()\n        self.konu_listesi = QListWidget(self)\n        self.konu_listesi.itemDoubleClicked.connect(self.accept)\n        layout.addWidget(self.konu_listesi)",
         "detail": "flash_cart",
         "documentation": {}
     },
@@ -193,7 +186,7 @@
         "kind": 6,
         "importPath": "flash_cart",
         "description": "flash_cart",
-        "peekOfCode": "class FlashKartUygulamasi(QMainWindow):\n    def __init__(self):\n        super().__init__()\n        self.db_conn = sqlite3.connect(\"flash_kart.db\")\n        self.init_db()\n        self.initUI()\n    def init_db(self):\n        cursor = self.db_conn.cursor()\n        cursor.execute(\"\"\"\n            CREATE TABLE IF NOT EXISTS topics (",
+        "peekOfCode": "class FlashKartUygulamasi(QMainWindow):\n    def __init__(self):\n        super().__init__()\n        self.db_conn = sqlite3.connect(\"flash_kart.db\")\n        self.veritabaniOlustur()\n        self.arayuzuOlustur()\n    def veritabaniOlustur(self):\n        cursor = self.db_conn.cursor()\n        cursor.execute(\"\"\"\n            CREATE TABLE IF NOT EXISTS topics (",
         "detail": "flash_cart",
         "documentation": {}
     }

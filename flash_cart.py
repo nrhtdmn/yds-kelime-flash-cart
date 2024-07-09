@@ -1,212 +1,259 @@
 import sys
 import sqlite3
+import random
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QTabWidget, QMessageBox, QAction, QInputDialog, QListWidget, QListWidgetItem, QDialog, QDialogButtonBox, QFormLayout, QLineEdit
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QTabWidget, QMessageBox, QAction, QInputDialog, QListWidget, QListWidgetItem, QDialog, QDialogButtonBox
 )
 from PyQt5.QtCore import Qt
 
 class FlashKartSekmesi(QWidget):
-    def __init__(self, db_conn, topic_id, parent=None):
+    def __init__(self, db_conn, konu_id, parent=None):
         super(FlashKartSekmesi, self).__init__(parent)
         
         self.db_conn = db_conn
-        self.topic_id = topic_id
-        self.initUI()
-        self.load_cards()
+        self.konu_id = konu_id
+        self.arayuzuOlustur()
+        self.kartlariYukle()
     
-    def initUI(self):
+    def arayuzuOlustur(self):
         layout = QVBoxLayout()
         
-        self.card_list = QListWidget(self)
-        self.card_list.itemDoubleClicked.connect(self.edit_card)
-        layout.addWidget(self.card_list)
+        self.kart_listesi = QListWidget(self)
+        self.kart_listesi.itemDoubleClicked.connect(self.kartiDuzenle)
+        layout.addWidget(self.kart_listesi)
         
-        button_layout = QHBoxLayout()
+        buton_layout = QHBoxLayout()
         
-        self.add_button = QPushButton("Ekle", self)
-        self.add_button.setFixedSize(100, 40)
-        self.add_button.setStyleSheet("font-size: 18px;")
-        self.add_button.clicked.connect(self.add_card)
-        button_layout.addWidget(self.add_button, alignment=Qt.AlignCenter)
+        self.ekle_butonu = QPushButton("Ekle", self)
+        self.ekle_butonu.setFixedSize(100, 40)
+        self.ekle_butonu.setStyleSheet("font-size: 18px;")
+        self.ekle_butonu.clicked.connect(self.kartEkle)
+        buton_layout.addWidget(self.ekle_butonu, alignment=Qt.AlignCenter)
         
-        self.delete_button = QPushButton("Sil", self)
-        self.delete_button.setFixedSize(100, 40)
-        self.delete_button.setStyleSheet("font-size: 18px;")
-        self.delete_button.clicked.connect(self.delete_card)
-        button_layout.addWidget(self.delete_button, alignment=Qt.AlignCenter)
+        self.sil_butonu = QPushButton("Sil", self)
+        self.sil_butonu.setFixedSize(100, 40)
+        self.sil_butonu.setStyleSheet("font-size: 18px;")
+        self.sil_butonu.clicked.connect(self.kartiSil)
+        buton_layout.addWidget(self.sil_butonu, alignment=Qt.AlignCenter)
 
-        self.study_button = QPushButton("Çalış", self)
-        self.study_button.setFixedSize(100, 40)
-        self.study_button.setStyleSheet("font-size: 18px;")
-        self.study_button.clicked.connect(self.study_cards)
-        button_layout.addWidget(self.study_button, alignment=Qt.AlignCenter)
+        self.calistir_butonu = QPushButton("Çalış", self)
+        self.calistir_butonu.setFixedSize(100, 40)
+        self.calistir_butonu.setStyleSheet("font-size: 18px;")
+        self.calistir_butonu.clicked.connect(self.kartlariCalistir)
+        buton_layout.addWidget(self.calistir_butonu, alignment=Qt.AlignCenter)
         
-        self.save_button = QPushButton("Kaydet", self)
-        self.save_button.setFixedSize(100, 40)
-        self.save_button.setStyleSheet("font-size: 18px;")
-        self.save_button.clicked.connect(self.save_all_cards)
-        button_layout.addWidget(self.save_button, alignment=Qt.AlignCenter)
+        self.kaydet_butonu = QPushButton("Kaydet", self)
+        self.kaydet_butonu.setFixedSize(100, 40)
+        self.kaydet_butonu.setStyleSheet("font-size: 18px;")
+        self.kaydet_butonu.clicked.connect(self.tumKartlariKaydet)
+        buton_layout.addWidget(self.kaydet_butonu, alignment=Qt.AlignCenter)
         
-        layout.addLayout(button_layout)
+        layout.addLayout(buton_layout)
         
         self.setLayout(layout)
         
-    def add_card(self):
-        front, ok1 = QInputDialog.getText(self, "Yeni Kart", "Ön Yüz:")
-        if ok1 and front:
-            back, ok2 = QInputDialog.getText(self, "Yeni Kart", "Arka Yüz:")
-            if ok2 and back:
-                card = f"Ön: {front}\nArka: {back}"
-                list_item = QListWidgetItem(card)
-                self.card_list.addItem(list_item)
-                self.save_card_to_db(front, back)
+    def kartEkle(self):
+        on_yuz, ok1 = QInputDialog.getText(self, "Yeni Kart", "Ön Yüz:")
+        if ok1 and on_yuz:
+            arka_yuz, ok2 = QInputDialog.getText(self, "Yeni Kart", "Arka Yüz:")
+            if ok2 and arka_yuz:
+                kart = f"Ön: {on_yuz}\nArka: {arka_yuz}"
+                liste_ogesi = QListWidgetItem(kart)
+                self.kart_listesi.addItem(liste_ogesi)
+                self.kartiVeritabaninaKaydet(on_yuz, arka_yuz)
     
-    def edit_card(self, item):
-        card = item.text().split('\n')
-        front = card[0].split(': ')[1]
-        back = card[1].split(': ')[1]
+    def kartiDuzenle(self, item):
+        kart = item.text().split('\n')
+        on_yuz = kart[0].split(': ')[1]
+        arka_yuz = kart[1].split(': ')[1]
         
-        new_front, ok1 = QInputDialog.getText(self, "Kartı Düzenle", "Ön Yüz:", text=front)
-        if ok1 and new_front:
-            new_back, ok2 = QInputDialog.getText(self, "Kartı Düzenle", "Arka Yüz:", text=back)
-            if ok2 and new_back:
-                new_card = f"Ön: {new_front}\nArka: {new_back}"
-                item.setText(new_card)
-                self.update_card_in_db(front, back, new_front, new_back)
+        yeni_on_yuz, ok1 = QInputDialog.getText(self, "Kartı Düzenle", "Ön Yüz:", text=on_yuz)
+        if ok1 and yeni_on_yuz:
+            yeni_arka_yuz, ok2 = QInputDialog.getText(self, "Kartı Düzenle", "Arka Yüz:", text=arka_yuz)
+            if ok2 and yeni_arka_yuz:
+                yeni_kart = f"Ön: {yeni_on_yuz}\nArka: {yeni_arka_yuz}"
+                item.setText(yeni_kart)
+                self.kartiVeritabanindaGuncelle(on_yuz, arka_yuz, yeni_on_yuz, yeni_arka_yuz)
     
-    def delete_card(self):
-        selected_item = self.card_list.currentItem()
-        if selected_item:
-            reply = QMessageBox.question(self, 'Silme Onayı', 'Bu kartı silmek istediğinize emin misiniz?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                card = selected_item.text().split('\n')
-                front = card[0].split(': ')[1]
-                back = card[1].split(': ')[1]
-                self.remove_card_from_db(front, back)
-                self.card_list.takeItem(self.card_list.currentRow())
+    def kartiSil(self):
+        secili_ogeyi = self.kart_listesi.currentItem()
+        if secili_ogeyi:
+            cevap = QMessageBox.question(self, 'Silme Onayı', 'Bu kartı silmek istediğinize emin misiniz?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if cevap == QMessageBox.Yes:
+                kart = secili_ogeyi.text().split('\n')
+                on_yuz = kart[0].split(': ')[1]
+                arka_yuz = kart[1].split(': ')[1]
+                self.kartiVeritabanindanSil(on_yuz, arka_yuz)
+                self.kart_listesi.takeItem(self.kart_listesi.currentRow())
 
-    def load_cards(self):
+    def kartlariYukle(self):
         cursor = self.db_conn.cursor()
-        cursor.execute("SELECT front, back FROM cards WHERE topic_id=?", (self.topic_id,))
+        cursor.execute("SELECT front, back FROM cards WHERE topic_id=?", (self.konu_id,))
         rows = cursor.fetchall()
         for row in rows:
-            front, back = row
-            card = f"Ön: {front}\nArka: {back}"
-            list_item = QListWidgetItem(card)
-            self.card_list.addItem(list_item)
+            on_yuz, arka_yuz = row
+            kart = f"Ön: {on_yuz}\nArka: {arka_yuz}"
+            liste_ogesi = QListWidgetItem(kart)
+            self.kart_listesi.addItem(liste_ogesi)
     
-    def save_card_to_db(self, front, back):
+    def kartiVeritabaninaKaydet(self, on_yuz, arka_yuz):
         cursor = self.db_conn.cursor()
-        cursor.execute("INSERT INTO cards (front, back, topic_id) VALUES (?, ?, ?)", (front, back, self.topic_id))
+        cursor.execute("INSERT INTO cards (front, back, topic_id) VALUES (?, ?, ?)", (on_yuz, arka_yuz, self.konu_id))
         self.db_conn.commit()
     
-    def update_card_in_db(self, old_front, old_back, new_front, new_back):
+    def kartiVeritabanindaGuncelle(self, eski_on_yuz, eski_arka_yuz, yeni_on_yuz, yeni_arka_yuz):
         cursor = self.db_conn.cursor()
-        cursor.execute("UPDATE cards SET front = ?, back = ? WHERE front = ? AND back = ? AND topic_id = ?", (new_front, new_back, old_front, old_back, self.topic_id))
+        cursor.execute("UPDATE cards SET front = ?, back = ? WHERE front = ? AND back = ? AND topic_id = ?", (yeni_on_yuz, yeni_arka_yuz, eski_on_yuz, eski_arka_yuz, self.konu_id))
         self.db_conn.commit()
     
-    def remove_card_from_db(self, front, back):
+    def kartiVeritabanindanSil(self, on_yuz, arka_yuz):
         cursor = self.db_conn.cursor()
-        cursor.execute("DELETE FROM cards WHERE front = ? AND back = ? AND topic_id = ?", (front, back, self.topic_id))
+        cursor.execute("DELETE FROM cards WHERE front = ? AND back = ? AND topic_id = ?", (on_yuz, arka_yuz, self.konu_id))
         self.db_conn.commit()
 
-    def study_cards(self):
-        self.study_window = StudyWindow(self.db_conn, self.topic_id)
-        self.study_window.show()
+    def kartlariCalistir(self):
+        self.calisma_penceresi = CalismaPenceresi(self.db_conn, self.konu_id)
+        self.calisma_penceresi.show()
 
-    def save_all_cards(self):
-        # Tüm kartları veritabanına kaydet
+    def tumKartlariKaydet(self):
         self.db_conn.commit()
         QMessageBox.information(self, "Başarılı", "Tüm kartlar kaydedildi.")
 
-class StudyWindow(QWidget):
-    def __init__(self, db_conn, topic_id, parent=None):
-        super(StudyWindow, self).__init__(parent)
+class CalismaPenceresi(QWidget):
+    def __init__(self, db_conn, konu_id, parent=None):
+        super(CalismaPenceresi, self).__init__(parent)
         
         self.db_conn = db_conn
-        self.topic_id = topic_id
-        self.initUI()
-        self.load_cards()
+        self.konu_id = konu_id
+        self.arayuzuOlustur()
+        self.kartlariYukle()
     
-    def initUI(self):
+    def arayuzuOlustur(self):
         self.setWindowTitle('Flash Kart Çalışma')
         self.setGeometry(150, 150, 400, 300)
         
         layout = QVBoxLayout()
         
-        self.card_label = QLabel("", self)
-        self.card_label.setAlignment(Qt.AlignCenter)
-        self.card_label.setStyleSheet("font-size: 24px;")
-        layout.addWidget(self.card_label)
+        self.kart_etiketi = QLabel("", self)
+        self.kart_etiketi.setAlignment(Qt.AlignCenter)
+        self.kart_etiketi.setStyleSheet("font-size: 24px;")
+        layout.addWidget(self.kart_etiketi)
         
-        button_layout = QHBoxLayout()
+        buton_layout = QHBoxLayout()
         
-        self.show_front_button = QPushButton("Ön Yüzü Göster", self)
-        self.show_front_button.setFixedSize(150, 40)
-        self.show_front_button.setStyleSheet("font-size: 18px;")
-        self.show_front_button.clicked.connect(self.show_front)
-        button_layout.addWidget(self.show_front_button, alignment=Qt.AlignCenter)
+        self.on_yuz_goster_butonu = QPushButton("Ön Yüzü Göster", self)
+        self.on_yuz_goster_butonu.setFixedSize(150, 40)
+        self.on_yuz_goster_butonu.setStyleSheet("font-size: 18px;")
+        self.on_yuz_goster_butonu.clicked.connect(self.onYuzuGoster)
+        buton_layout.addWidget(self.on_yuz_goster_butonu, alignment=Qt.AlignCenter)
 
-        self.show_back_button = QPushButton("Arka Yüzü Göster", self)
-        self.show_back_button.setFixedSize(150, 40)
-        self.show_back_button.setStyleSheet("font-size: 18px;")
-        self.show_back_button.clicked.connect(self.show_back)
-        button_layout.addWidget(self.show_back_button, alignment=Qt.AlignCenter)
+        self.arka_yuz_goster_butonu = QPushButton("Arka Yüzü Göster", self)
+        self.arka_yuz_goster_butonu.setFixedSize(150, 40)
+        self.arka_yuz_goster_butonu.setStyleSheet("font-size: 18px;")
+        self.arka_yuz_goster_butonu.clicked.connect(self.arkaYuzuGoster)
+        buton_layout.addWidget(self.arka_yuz_goster_butonu, alignment=Qt.AlignCenter)
         
-        self.next_button = QPushButton("Sonraki", self)
-        self.next_button.setFixedSize(100, 40)
-        self.next_button.setStyleSheet("font-size: 18px;")
-        self.next_button.clicked.connect(self.next_card)
-        button_layout.addWidget(self.next_button, alignment=Qt.AlignCenter)
+        self.sonraki_buton = QPushButton("Sonraki", self)
+        self.sonraki_buton.setFixedSize(100, 40)
+        self.sonraki_buton.setStyleSheet("font-size: 18px;")
+        self.sonraki_buton.clicked.connect(self.sonrakiKart)
+        buton_layout.addWidget(self.sonraki_buton, alignment=Qt.AlignCenter)
         
-        layout.addLayout(button_layout)
+        layout.addLayout(buton_layout)
         
         self.setLayout(layout)
         
-        self.cards = []
-        self.current_card_index = -1
+        self.kartlar = []
+        self.guncel_kart_indeksi = -1
     
-    def load_cards(self):
+    def kartlariYukle(self):
         cursor = self.db_conn.cursor()
-        cursor.execute("SELECT front, back FROM cards WHERE topic_id=?", (self.topic_id,))
-        self.cards = cursor.fetchall()
-        self.next_card()
+        cursor.execute("SELECT front, back FROM cards WHERE topic_id=?", (self.konu_id,))
+        self.kartlar = cursor.fetchall()
+        random.shuffle(self.kartlar)
+        self.sonrakiKart()
     
-    def show_front(self):
-        if self.current_card_index >= 0:
-            self.card_label.setText(self.cards[self.current_card_index][0])
+    def onYuzuGoster(self):
+        if self.guncel_kart_indeksi >= 0:
+            self.kart_etiketi.setText(self.kartlar[self.guncel_kart_indeksi][0])
 
-    def show_back(self):
-        if self.current_card_index >= 0:
-            self.card_label.setText(self.cards[self.current_card_index][1])
+    def arkaYuzuGoster(self):
+        if self.guncel_kart_indeksi >= 0:
+            self.kart_etiketi.setText(self.kartlar[self.guncel_kart_indeksi][1])
     
-    def next_card(self):
-        self.current_card_index = (self.current_card_index + 1) % len(self.cards)
-        self.card_label.setText(self.cards[self.current_card_index][0])
+    def sonrakiKart(self):
+        if len(self.kartlar) == 0:
+            QMessageBox.warning(self, "Uyarı", "Bu konuda hiç kart yok.")
+            return
+        self.guncel_kart_indeksi += 1
+        if self.guncel_kart_indeksi >= len(self.kartlar):
+            cevap = QMessageBox.question(self, 'Bitti', 'Tüm kartlar gösterildi. Yeniden başlatmak ister misiniz?', QMessageBox.Yes | QMessageBox.No)
+            if cevap == QMessageBox.Yes:
+                self.guncel_kart_indeksi = 0
+            else:
+                self.close()
+                return
+        self.kart_etiketi.setText(self.kartlar[self.guncel_kart_indeksi][0])
 
 class KonuSecmeDialog(QDialog):
-    def __init__(self, topics, parent=None):
+    def __init__(self, db_conn, parent=None):
         super(KonuSecmeDialog, self).__init__(parent)
         self.setWindowTitle("Konuyu Seç")
-        self.setGeometry(200, 200, 300, 200)
+        self.setGeometry(200, 200, 300, 300)
+        
+        self.db_conn = db_conn
         
         layout = QVBoxLayout()
-        self.topic_list = QListWidget(self)
-        for topic in topics:
-            self.topic_list.addItem(topic)
-        layout.addWidget(self.topic_list)
         
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self.konu_listesi = QListWidget(self)
+        self.konu_listesi.itemDoubleClicked.connect(self.accept)
+        layout.addWidget(self.konu_listesi)
+        
+        self.konulariYukle()
+        
+        buton_layout = QHBoxLayout()
+        
+        self.sil_butonu = QPushButton("Sil", self)
+        self.sil_butonu.setFixedSize(100, 40)
+        self.sil_butonu.setStyleSheet("font-size: 18px;")
+        self.sil_butonu.clicked.connect(self.konuSil)
+        buton_layout.addWidget(self.sil_butonu, alignment=Qt.AlignCenter)
+        
+        self.ac_butonu = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        self.ac_butonu.accepted.connect(self.accept)
+        self.ac_butonu.rejected.connect(self.reject)
+        buton_layout.addWidget(self.ac_butonu)
+        
+        layout.addLayout(buton_layout)
         
         self.setLayout(layout)
     
-    def get_selected_topic(self):
-        selected_item = self.topic_list.currentItem()
-        if selected_item:
-            return selected_item.text()
+    def konulariYukle(self):
+        cursor = self.db_conn.cursor()
+        cursor.execute("SELECT name FROM topics")
+        konular = [row[0] for row in cursor.fetchall()]
+        self.konu_listesi.clear()
+        for konu in konular:
+            self.konu_listesi.addItem(konu)
+    
+    def konuSil(self):
+        secili_ogeyi = self.konu_listesi.currentItem()
+        if secili_ogeyi:
+            cevap = QMessageBox.question(self, 'Silme Onayı', 'Bu konuyu silmek istediğinize emin misiniz?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if cevap == QMessageBox.Yes:
+                konu_adi = secili_ogeyi.text()
+                cursor = self.db_conn.cursor()
+                cursor.execute("SELECT id FROM topics WHERE name=?", (konu_adi,))
+                konu_id = cursor.fetchone()[0]
+                cursor.execute("DELETE FROM topics WHERE id=?", (konu_id,))
+                cursor.execute("DELETE FROM cards WHERE topic_id=?", (konu_id,))
+                self.db_conn.commit()
+                self.konulariYukle()
+    
+    def seciliKonuyuAl(self):
+        secili_ogeyi = self.konu_listesi.currentItem()
+        if secili_ogeyi:
+            return secili_ogeyi.text()
         return None
 
 class FlashKartUygulamasi(QMainWindow):
@@ -214,10 +261,10 @@ class FlashKartUygulamasi(QMainWindow):
         super().__init__()
         
         self.db_conn = sqlite3.connect("flash_kart.db")
-        self.init_db()
-        self.initUI()
+        self.veritabaniOlustur()
+        self.arayuzuOlustur()
     
-    def init_db(self):
+    def veritabaniOlustur(self):
         cursor = self.db_conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS topics (
@@ -236,103 +283,101 @@ class FlashKartUygulamasi(QMainWindow):
         """)
         self.db_conn.commit()
     
-    def initUI(self):
+    def arayuzuOlustur(self):
         self.setWindowTitle('Flash Kart Uygulaması')
         self.setGeometry(100, 100, 600, 400)
         
-        self.tab_widget = QTabWidget(self)
-        self.tab_widget.setTabsClosable(True)
-        self.tab_widget.tabBarDoubleClicked.connect(self.sekme_ismini_duzenle)
-        self.tab_widget.tabCloseRequested.connect(self.sekme_kapat)
-        self.setCentralWidget(self.tab_widget)
+        self.sekme_widgeti = QTabWidget(self)
+        self.sekme_widgeti.setTabsClosable(True)
+        self.sekme_widgeti.tabBarDoubleClicked.connect(self.sekmeIsminiDuzenle)
+        self.sekme_widgeti.tabCloseRequested.connect(self.sekmeKapat)
+        self.setCentralWidget(self.sekme_widgeti)
         
-        self.load_topics()
+        self.konulariYukle()
         
         menubar = self.menuBar()
         kart_menu = menubar.addMenu('Kartlar')
         
         yeni_action = QAction("Yeni Konu Ekle", self)
         yeni_action.setShortcut("Ctrl+N")
-        yeni_action.triggered.connect(self.yeni_konu_ekle)
+        yeni_action.triggered.connect(self.yeniKonuEkle)
         kart_menu.addAction(yeni_action)
         
         sekme_duzenle_action = QAction("Sekme İsmini Düzenle", self)
         sekme_duzenle_action.setShortcut("Ctrl+E")
-        sekme_duzenle_action.triggered.connect(self.sekme_ismini_duzenle)
+        sekme_duzenle_action.triggered.connect(self.sekmeIsminiDuzenle)
         kart_menu.addAction(sekme_duzenle_action)
 
         konu_ac_action = QAction("Konuyu Aç", self)
         konu_ac_action.setShortcut("Ctrl+O")
-        konu_ac_action.triggered.connect(self.konu_ac)
+        konu_ac_action.triggered.connect(self.konuAc)
         kart_menu.addAction(konu_ac_action)
         
         # QSS stili uygula
-        self.setStyleSheet(self.qss_stili())
+        self.setStyleSheet(self.qssStili())
         
         self.show()
     
-    def load_topics(self):
+    def konulariYukle(self):
         cursor = self.db_conn.cursor()
         cursor.execute("SELECT id, name FROM topics")
         rows = cursor.fetchall()
         for row in rows:
-            topic_id, name = row
-            self.yeni_kart_ekle(topic_id, name)
+            konu_id, ad = row
+            self.yeniSekmeEkle(konu_id, ad)
     
-    def yeni_konu_ekle(self):
-        name, ok = QInputDialog.getText(self, "Yeni Konu", "Konu İsmi:")
-        if ok and name:
+    def yeniKonuEkle(self):
+        ad, ok = QInputDialog.getText(self, "Yeni Konu", "Konu İsmi:")
+        if ok and ad:
             cursor = self.db_conn.cursor()
-            cursor.execute("INSERT INTO topics (name) VALUES (?)", (name,))
+            cursor.execute("INSERT INTO topics (name) VALUES (?)", (ad,))
             self.db_conn.commit()
-            topic_id = cursor.lastrowid
-            self.yeni_kart_ekle(topic_id, name)
+            konu_id = cursor.lastrowid
+            self.yeniSekmeEkle(konu_id, ad)
 
-    def konu_ac(self):
-        cursor = self.db_conn.cursor()
-        cursor.execute("SELECT name FROM topics")
-        topics = [row[0] for row in cursor.fetchall()]
-        dialog = KonuSecmeDialog(topics, self)
+    def konuAc(self):
+        dialog = KonuSecmeDialog(self.db_conn, self)
         if dialog.exec_() == QDialog.Accepted:
-            konu = dialog.get_selected_topic()
+            konu = dialog.seciliKonuyuAl()
             if konu:
+                cursor = self.db_conn.cursor()
                 cursor.execute("SELECT id FROM topics WHERE name=?", (konu,))
-                topic_id = cursor.fetchone()[0]
-                self.yeni_kart_ekle(topic_id, konu)
+                konu_id = cursor.fetchone()[0]
+                self.yeniSekmeEkle(konu_id, konu)
     
-    def yeni_kart_ekle(self, topic_id=None, name=None):
-        if topic_id is None or name is None:
+    def yeniSekmeEkle(self, konu_id=None, ad=None):
+        if konu_id is None or ad is None:
             return
         
-        for i in range(self.tab_widget.count()):
-            if self.tab_widget.tabText(i) == name:
-                self.tab_widget.setCurrentIndex(i)
+        for i in range(self.sekme_widgeti.count()):
+            if self.sekme_widgeti.tabText(i) == ad:
+                self.sekme_widgeti.setCurrentIndex(i)
                 return
         
-        yeni_sekme = FlashKartSekmesi(self.db_conn, topic_id)
-        self.tab_widget.addTab(yeni_sekme, name)
-        self.tab_widget.setCurrentWidget(yeni_sekme)
+        yeni_sekme = FlashKartSekmesi(self.db_conn, konu_id)
+        self.sekme_widgeti.addTab(yeni_sekme, ad)
+        self.sekme_widgeti.setCurrentWidget(yeni_sekme)
     
-    def sekme_ismini_duzenle(self, index=None):
+    def sekmeIsminiDuzenle(self, index=None):
         if index is None:
-            index = self.tab_widget.currentIndex()
+            index = self.sekme_widgeti.currentIndex()
         
         if index >= 0:
-            current_name = self.tab_widget.tabText(index)
-            yeni_isim, ok = QInputDialog.getText(self, "Sekme İsmini Düzenle", "Yeni isim girin:", text=current_name)
+            mevcut_isim = self.sekme_widgeti.tabText(index)
+            yeni_isim, ok = QInputDialog.getText(self, "Sekme İsmini Düzenle", "Yeni isim girin:", text=mevcut_isim)
             if ok and yeni_isim:
-                self.tab_widget.setTabText(index, yeni_isim)
-                topic_id = self.tab_widget.widget(index).topic_id
+                self.sekme_widgeti.setTabText(index, yeni_isim)
+                konu_id = self.sekme_widgeti.widget(index).konu_id
                 cursor = self.db_conn.cursor()
-                cursor.execute("UPDATE topics SET name = ? WHERE id = ?", (yeni_isim, topic_id))
+                cursor.execute("UPDATE topics SET name = ? WHERE id = ?", (yeni_isim, konu_id))
                 self.db_conn.commit()
     
-    def sekme_kapat(self, index):
-        topic_id = self.tab_widget.widget(index).topic_id
+    def sekmeKapat(self, index):
+        konu_id = self.sekme_widgeti.widget(index).konu_id
         self.db_conn.commit()
-        self.tab_widget.removeTab(index)
+        self.sekme_widgeti.removeTab(index)
     
-    def qss_stili(self):
+    def qssStili(self):
         return """
         QMainWindow {
             background-color: #f0f0f0;
